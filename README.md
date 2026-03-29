@@ -29,3 +29,4 @@ O projeto segue os princípios de **Clean Code** e **SOLID**, com separação cl
 Na raiz do projeto (onde se encontra o `docker-compose.yml`), execute:
 ```bash
 docker-compose up -d
+# fluxo-estoque
