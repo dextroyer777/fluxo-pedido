@@ -1,0 +1,67 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1
+
+spring:
+  application:
+    name: ms-pedidos
+  
+  # ATENÇÃO: Habilita Virtual Threads do Java 21 para escalabilidade massiva
+  threads:
+    virtual:
+      enabled: true
+
+  # Configuração do Banco de Dados (PostgreSQL)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ecommerce_db
+    username: user
+    password: password
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate # Em produção, use 'validate' com Flyway/Liquibase
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Configuração do Kafka (Mensageria)
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # Garante que a mensagem foi escrita no líder e nas réplicas (Segurança)
+      acks: all 
+      retries: 3
+    properties:
+      spring.json.trusted.packages: "*"
+
+# Configuração de Observabilidade (Actuator + Prometheus)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Configurações de Resiliência (Resilience4j)
+resilience4j:
+  circuitbreaker:
+    instances:
+      kafkaProducer:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowType: COUNT_BASED
+        minimumNumberOfCalls: 5
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
