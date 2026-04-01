@@ -1,32 +1,85 @@
-# Fluxo Pedido - Microserviço de Vendas
+# 📦 Microserviço: Fluxo de Pedido
 
-Este microserviço é responsável pela criação e gestão de pedidos no ecossistema de e-commerce. Ele atua como o produtor de eventos para o tópico de mensageria, iniciando o fluxo de processamento assíncrono.
+Este microserviço é o ponto de entrada para a criação de pedidos no ecossistema. Desenvolvido com **Java 21** e **Spring Boot**, ele foca em alta performance, consistência de dados e baixo acoplamento através de uma arquitetura orientada a eventos (EDA).
 
-## 🚀 Tecnologias e Conceitos
-* **Java 21**: Utilizando as últimas funcionalidades da linguagem.
-* **Spring Boot 3.x**: Framework base para a construção da API.
-* **Project Loom (Virtual Threads)**: Configurado para processamento de alto desempenho e escalabilidade.
-* **Apache Kafka**: Utilizado para comunicação assíncrona entre microserviços.
-* **PostgreSQL**: Banco de dados relacional para persistência de pedidos.
-* **Docker & Docker Compose**: Orquestração do ambiente de infraestrutura (Kafka, Zookeeper, Postgres).
+## 🚀 Tecnologias Utilizadas
+* **Linguagem:** Java 21
+* **Framework:** Spring Boot 3.x
+* **Mensageria:** Apache Kafka
+* **Persistência:** PostgreSQL / Spring Data JPA
+* **Documentação de API:** Swagger/OpenAPI
+* **Observabilidade:** Micrometer, Prometheus e Grafana
 
-## 🏗️ Arquitetura
-O projeto segue os princípios de **Clean Code** e **SOLID**, com separação clara entre as camadas de infraestrutura e domínio.
+## 🏗️ Arquitetura e Fluxo de Dados
+O serviço segue os princípios de **Clean Code** e **SOLID**, garantindo que a regra de negócio esteja isolada das implementações de infraestrutura.
 
-1. **Controller**: Recebe as requisições HTTP de novos pedidos.
-2. **Service**: Contém a lógica de negócio e as regras de validação.
-3. **Messaging (Producer)**: Envia o evento `OrderEvent` para o tópico `pedidos-criados` no Kafka.
-4. **Repository**: Persiste os dados iniciais do pedido no banco de dados.
+### Diagrama de Sequência
+O fluxo abaixo descreve desde a recepção da requisição via REST até a propagação do evento para o Broker.
 
-## ⚙️ Configuração do Ambiente
+```mermaid
+sequenceDiagram
+    participant C as Cliente
+    participant API as PedidoController
+    participant S as PedidoService
+    participant DB as Banco de Dados
+    participant K as Apache Kafka
 
-### Pré-requisitos
-* **openSUSE Leap 15.6** (ou outro ambiente Linux).
-* **Docker & Docker Compose** instalados.
-* **Java 21** e **Maven**.
+    C->>API: POST /api/v1/pedidos
+    API->>S: processar(PedidoDTO)
+    activate S
+    S->>DB: salvar(Entity)
+    DB-->>S: Confirmação
+    S->>K: Publicar evento 'pedido-criado'
+    K-->>S: Ack
+    S-->>API: PedidoResponse
+    deactivate S
+    API-->>C: 201 Created
 
-### Executando a Infraestrutura
-Na raiz do projeto (onde se encontra o `docker-compose.yml`), execute:
-```bash
-docker-compose up -d
-# fluxo-estoque
+## 🧩 Diagrama de Classes (Arquitetura Interna)
+
+A estrutura do projeto foi desenhada seguindo os princípios de **Inversão de Dependência (DIP)** e **Responsabilidade Única (SRP)**. O diagrama abaixo detalha a interação entre os principais componentes do microserviço:
+
+```mermaid
+classDiagram
+    class PedidoController {
+        -PedidoService service
+        +criarPedido(PedidoRequest) ResponseEntity
+        +buscarPorId(Long) ResponseEntity
+    }
+
+    class PedidoService {
+        <<interface>>
+        +salvar(Pedido) Pedido
+        +notificar(Pedido) void
+    }
+
+    class PedidoServiceImpl {
+        -PedidoRepository repository
+        -KafkaProducer producer
+        +salvar(Pedido) Pedido
+        +notificar(Pedido) void
+    }
+
+    class PedidoRepository {
+        <<interface>>
+        +save(Pedido) Pedido
+        +findById(Long) Optional
+    }
+
+    class Pedido {
+        +Long id
+        +String clienteId
+        +BigDecimal valorTotal
+        +LocalDateTime dataCriacao
+    }
+
+    class KafkaProducer {
+        -KafkaTemplate template
+        +send(String topic, PedidoEvent event)
+    }
+
+    PedidoController --> PedidoService : "Usa"
+    PedidoService <|.. PedidoServiceImpl : "Implementa"
+    PedidoServiceImpl --> PedidoRepository : "Persiste dados"
+    PedidoServiceImpl --> KafkaProducer : "Dispara eventos"
+    PedidoRepository ..> Pedido : "Gerencia"
