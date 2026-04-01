@@ -34,6 +34,7 @@ sequenceDiagram
     S-->>API: PedidoResponse
     deactivate S
     API-->>C: 201 Created
+```
 
 ## 🧩 Diagrama de Classes (Arquitetura Interna)
 
